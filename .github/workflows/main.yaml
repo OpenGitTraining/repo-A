@@ -15,10 +15,6 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Configure
-              run: |
-                apt update && apt install clang lld ninja cmake
-
             - name: Generate
               run: |
                 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
