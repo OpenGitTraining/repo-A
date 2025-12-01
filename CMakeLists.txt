@@ -1,8 +1,16 @@
 cmake_minimum_required(VERSION 3.21)
 project(repo-a)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(app)
 target_sources(app PUBLIC include/a.hpp src/a.cpp)
 target_include_directories(app PUBLIC include)
+
+add_executable(appTest)
+target_sources(appTest PRIVATE tests/a.test.cpp)
+target_link_libraries(appTest PRIVATE app)
+
+include(CTest)
+enable_testing()
+add_test(NAME appCTest COMMAND appTest --config Release --exe $<TARGET_FILE:appTest>)
