@@ -3,7 +3,7 @@ run-name: Build, Test and Deploy Repo-A
 
 on:
     workflow_dispatch:
-    pull_requests:
+    pull_request:
         branches: ["main"]
     push:
         branches: [ "main" ]
