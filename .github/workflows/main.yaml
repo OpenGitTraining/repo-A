@@ -30,3 +30,13 @@ jobs:
             - name: Package
               run: |
                 cmake --build build --target package
+
+            - name: Create GitHub Release
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                gh release create "${GITHUB_REF#regs/tags/}" \
+                ./dist/* \
+                --prerelease \
+                --title "Release ${GITHUB_REF#refs/tags/}" \
+                --notes "Automated release"
