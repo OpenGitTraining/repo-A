@@ -34,9 +34,6 @@ jobs:
               run: |
                 cmake --build build --target package
 
-            - name: Install GitHub CLI
-              uses: cli/cli@v2
-
             - name: Create GitHub Release
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
