@@ -34,12 +34,47 @@ jobs:
               run: |
                 cmake --build build --target package
 
+            - name: Tagging
+              id: tagging
+              run: |
+                # fetch tags so git can see them
+                git fetch --tags origin
+
+                # list all tags (change the pattern later if you want)
+                TAGS=$(git tag --list)
+
+                if [ -z "$TAGS" ]; then
+                  # No tags yet → first version
+                  BASE_VERSION="0.1.0"
+                  RC_TAG="${BASE_VERSION}-rc"
+                else
+                  # TODO: logic for bumping from the latest tag
+                  # For now just fail so you notice
+                  echo "Existing tags found, but bump logic is not implemented yet."
+                  exit 1
+                fi
+
+                echo "base_version=$BASE_VERSION"
+                echo "rc_tag=$RC_TAG"
+
+                echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+                echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+            
+            - name: Create RC tag
+              run: |
+                git config user.name "github-actions"
+                git config user.email "github-actions@users.noreply.github.com"
+
+                git tag "${{ steps.version.outputs.rc_tag }}" "${GITHUB_SHA}"
+                git push origin "${{ steps.version.outputs.rc_tag }}"
+
             - name: Create GitHub Release
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                gh release create "${GITHUB_REF#regs/tags/}" \
+                TAG="${{ steps.tagging.outputs.rc_tag }}"
+                gh release create "$TAG" \
                 ./out/* \
                 --prerelease \
-                --title "Release ${GITHUB_REF#refs/tags/}" \
+                --title "Release $TAG" \
                 --notes "Automated release"
