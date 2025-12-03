@@ -1,5 +1,4 @@
-name: A Build Workflow
-run-name: Build, Test and Deploy Repo-A
+name: Main
 
 on:
     workflow_dispatch:
@@ -40,18 +39,40 @@ jobs:
                 # fetch tags so git can see them
                 git fetch --tags origin
 
-                # list all tags (change the pattern later if you want)
-                TAGS=$(git tag --list)
+                # # list all tags (change the pattern later if you want)
+                # TAGS=$(git tag --list)
+                
+                echo "Fetching latest tag with gh..."
+                LATEST_TAG=$(gh api "repos/${GITHUB_REPOSITORY}/tags" --jq '.[0].name' 2>/dev/null || echo "")
 
-                if [ -z "$TAGS" ]; then
+                if [ -z "$LATEST_TAG" ]; then
                   # No tags yet → first version
                   BASE_VERSION="0.1.0"
                   RC_TAG="${BASE_VERSION}-rc"
                 else
-                  # TODO: logic for bumping from the latest tag
-                  # For now just fail so you notice
-                  echo "Existing tags found, but bump logic is not implemented yet."
-                  exit 1
+                  echo "Latest tag found: $LATEST_TAG"
+
+                  # Strip optional leading refs/tags/ and v
+                  LATEST_TAG="${LATEST_TAG#refs/tags/}"
+                  LATEST_TAG_NO_V="${LATEST_TAG#v}"
+
+                  # Remove -rc or -rc.N suffix if present
+                  BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
+
+                  echo "Base part parsed: $BASE_PART"
+
+                  # Split version
+                  IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
+
+                  if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
+                    echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
+                    exit 1
+                  fi
+
+                  # Bump patch for new RC
+                  PATCH=$((PATCH + 1))
+                  BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+                  RC_TAG="${BASE_VERSION}-rc"
                 fi
 
                 echo "base_version=$BASE_VERSION"
@@ -73,8 +94,11 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                 TAG="${{ steps.tagging.outputs.rc_tag }}"
+                ASSETS=$(find ./out -type f )
+                echo "$ASSETS"
+
                 gh release create "$TAG" \
                 ./out/* \
                 --prerelease \
-                --title "Release $TAG" \
-                --notes "Automated release"
+                --title "Pre-Release $TAG" \
+                --notes "Automated Pre-release"
