@@ -43,7 +43,7 @@ jobs:
                 # TAGS=$(git tag --list)
                 
                 echo "Fetching latest tag with gh..."
-                LATEST_TAG=$(gh api "repos/${{ github.repository }}/tags" --jq '.[0].name' 2>/dev/null || echo "")
+                LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
                 echo "LATEST_TAG: $LATEST_TAG"
 
                 if [ -z "$LATEST_TAG" ]; then
