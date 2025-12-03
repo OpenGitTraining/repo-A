@@ -39,13 +39,8 @@ jobs:
                 # fetch tags so git can see them
                 git fetch --tags origin
 
-                # # list all tags (change the pattern later if you want)
-                # TAGS=$(git tag --list)
-                
                 echo "Fetching latest tag with gh..."
-                LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
-                echo "LATEST_TAG: $LATEST_TAG"
-                echo "$(git rev-list --tags --max-count=1)"
+                LATEST_TAG=$(git tag --list --sort=-creatordate | head -n 1 || echo "")
 
                 if [ -z "$LATEST_TAG" ]; then
                   # No tags yet → first version
