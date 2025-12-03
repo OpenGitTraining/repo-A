@@ -45,6 +45,7 @@ jobs:
                 echo "Fetching latest tag with gh..."
                 LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
                 echo "LATEST_TAG: $LATEST_TAG"
+                echo "$(git rev-list --tags --max-count=1)"
 
                 if [ -z "$LATEST_TAG" ]; then
                   # No tags yet → first version
