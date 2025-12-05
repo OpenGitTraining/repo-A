@@ -106,9 +106,9 @@ jobs:
                 --title "Pre-Release $TAG" \
                 --notes "Automated Pre-release"
 
-                echo "tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+                echo "tag=$TAG" >> "$GITHUB_OUTPUT"
                 # Release URL (for convenience, optional)
-                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RC_TAG"
+                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
                 echo "release_url=$URL" >> "$GITHUB_OUTPUT"
 
     notify:
