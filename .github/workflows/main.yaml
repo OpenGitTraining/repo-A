@@ -13,6 +13,10 @@ permissions:
 jobs:
     build:
         runs-on: [ ubuntu-latest ]
+
+        outputs:
+            tag: ${{ steps.prerelease.outputs.tag }}
+            release_url: ${{ steps.prerelease.outputs.release_url }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -87,7 +91,8 @@ jobs:
                 git tag "${{ steps.tagging.outputs.rc_tag }}" "${GITHUB_SHA}"
                 git push origin "${{ steps.tagging.outputs.rc_tag }}"
 
-            - name: Create GitHub Release
+            - name: Create GitHub Pre-Release
+              id: prerelease
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
@@ -110,6 +115,6 @@ jobs:
       needs: build
       uses: ./.github/workflows/notify-manager.yaml
       with:
-        tag: ${{ needs.release.outputs.tag }}
-        release_url: ${{ needs.release.outputs.release_url }}
+        tag: ${{ needs.build.outputs.tag }}
+        release_url: ${{ needs.build.outputs.release_url }}
         source_repo: ${{ github.repository }}
