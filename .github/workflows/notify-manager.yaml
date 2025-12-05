@@ -1,0 +1,75 @@
+name: Notify repo-a-manager when RC is created
+
+on:
+  # Fires when you create a prerelease in the UI or via API
+  release:
+    types: [prereleased]
+
+permissions:
+  contents: read
+
+env:
+  ORCH_REPO: OpenGitTraining/repo-a-manager
+  ORCH_EVENT_TYPE: rc-created
+
+jobs:
+  notify-orchestrator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract tag and basic info
+        id: info
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          echo "url=${{ github.event.release.html_url }}" >> "$GITHUB_OUTPUT"
+
+      - name: Check that this is an RC tag
+        id: rc_check
+        run: |
+          TAG="${{ steps.info.outputs.tag }}"
+          if [[ "$TAG" != *"-rc"* ]]; then
+            echo "This release tag ($TAG) does not look like an RC (no '-rc' suffix)."
+            echo "should_notify=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Detected RC tag: $TAG"
+            echo "should_notify=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip non-RC releases
+        if: steps.rc_check.outputs.should_notify != 'true'
+        run: echo "Not an RC → skipping notification to orchestrator."
+
+      - name: Generate installation token (GitHub App)
+        if: steps.rc_check.outputs.should_notify == 'true'
+        id: app_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
+          installation_id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__INSTALLATION_ID }}
+          private_key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
+
+      - name: Notify orchestrator (repo-a-manager)
+        if: steps.rc_check.outputs.should_notify == 'true'
+        run: |
+          TAG="${{ steps.info.outputs.tag }}"
+          SRC_REPO="${{ steps.info.outputs.repo }}"
+          RELEASE_URL="${{ steps.info.outputs.url }}"
+
+          echo "Notifying orchestrator ${{ env.ORCH_REPO }} for $SRC_REPO@$TAG"
+
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ steps.app_token.outputs.token }}" \
+            "https://api.github.com/repos/${{ env.ORCH_REPO }}/dispatches" \
+            -d @- <<EOF
+          {
+            "event_type": "${{ env.ORCH_EVENT_TYPE }}",
+            "client_payload": {
+              "source_repo": "$SRC_REPO",
+              "tag": "$TAG",
+              "release_url": "$RELEASE_URL"
+            }
+          }
+          EOF
