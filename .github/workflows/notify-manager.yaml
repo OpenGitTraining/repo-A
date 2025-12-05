@@ -1,10 +1,6 @@
 name: Notify Orchestrator on RC created
 
 on:
-  # Fires when you create a prerelease in the UI or via API
-  release:
-    types: [prereleased]
-
   # Allows other workflows in this repo to call it directly
   workflow_call:
     inputs:
