@@ -77,8 +77,9 @@ jobs:
 
                 echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
                 echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
-            
+
             - name: Create RC tag
+              id: create_rc
               run: |
                 git config user.name "github-actions"
                 git config user.email "github-actions@users.noreply.github.com"
@@ -99,3 +100,16 @@ jobs:
                 --prerelease \
                 --title "Pre-Release $TAG" \
                 --notes "Automated Pre-release"
+
+                echo "tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+                # Release URL (for convenience, optional)
+                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RC_TAG"
+                echo "release_url=$URL" >> "$GITHUB_OUTPUT"
+
+            - name: Notify Orchestrator
+              uses: ./.github/workflows/notify-manager.yaml
+              needs: create_rc
+              with:
+                tag: ${{ needs.release.outputs.tag }}
+                release_url: ${{ needs.release.outputs.release_url }}
+                source_repo: ${{ github.repository }}
