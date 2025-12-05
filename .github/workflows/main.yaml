@@ -13,6 +13,10 @@ permissions:
 jobs:
     build:
         runs-on: [ ubuntu-latest ]
+
+        outputs:
+            tag: ${{ steps.prerelease.outputs.tag }}
+            release_url: ${{ steps.prerelease.outputs.release_url }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -87,7 +91,8 @@ jobs:
                 git tag "${{ steps.tagging.outputs.rc_tag }}" "${GITHUB_SHA}"
                 git push origin "${{ steps.tagging.outputs.rc_tag }}"
 
-            - name: Create GitHub Release
+            - name: Create GitHub Pre-Release
+              id: prerelease
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
@@ -101,14 +106,15 @@ jobs:
                 --title "Pre-Release $TAG" \
                 --notes "Automated Pre-release"
 
-                echo "tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+                echo "tag=$TAG" >> "$GITHUB_OUTPUT"
                 # Release URL (for convenience, optional)
-                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$RC_TAG"
+                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
                 echo "release_url=$URL" >> "$GITHUB_OUTPUT"
 
-            - name: Notify Orchestrator
-              uses: .github/workflows/notify-manager.yaml
-              with:
-                tag: ${{ needs.release.outputs.tag }}
-                release_url: ${{ needs.release.outputs.release_url }}
-                source_repo: ${{ github.repository }}
+    notify:
+      needs: build
+      uses: ./.github/workflows/notify-manager.yaml
+      with:
+        tag: ${{ needs.build.outputs.tag }}
+        release_url: ${{ needs.build.outputs.release_url }}
+        source_repo: ${{ github.repository }}
