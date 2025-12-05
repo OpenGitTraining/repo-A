@@ -107,7 +107,7 @@ jobs:
                 echo "release_url=$URL" >> "$GITHUB_OUTPUT"
 
             - name: Notify Orchestrator
-              uses: .github/workflows/notify-manager.yaml
+              uses: ./.github/workflows/notify-manager.yaml
               with:
                 tag: ${{ needs.release.outputs.tag }}
                 release_url: ${{ needs.release.outputs.release_url }}
