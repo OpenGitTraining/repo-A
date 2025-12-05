@@ -82,6 +82,15 @@ jobs:
           app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
           private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
 
+      - name: Debug check access to repo-a-manager
+        run: |
+          echo "Checking access to OpenGitTraining/repo-a-manager..."
+          curl -sS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ steps.app_token.outputs.token }}" \
+            https://api.github.com/repos/OpenGitTraining/repo-a-manager
+
+
       - name: Notify orchestrator (repo-a-manager)
         if: steps.rc_check.outputs.should_notify == 'true'
         run: |
