@@ -118,3 +118,4 @@ jobs:
         tag: ${{ needs.build.outputs.tag }}
         release_url: ${{ needs.build.outputs.release_url }}
         source_repo: ${{ github.repository }}
+      secrets: inherit

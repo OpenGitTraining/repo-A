@@ -77,10 +77,6 @@ jobs:
         with:
           app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
           private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: |
-            repo-a
-            repo-a-manager
 
       - name: Debug check access to repo-a-manager
         run: |
