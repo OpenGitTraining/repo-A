@@ -5,6 +5,19 @@ on:
   release:
     types: [prereleased]
 
+  # Allows other workflows in this repo to call it directly
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      release_url:
+        required: false
+        type: string
+      source_repo:
+        required: false
+        type: string
+
 permissions:
   contents: read
 
@@ -17,13 +30,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Extract tag and basic info
+      # Normalize inputs: support both 'release' and 'workflow_call'
+      - name: Collect tag / repo / url
         id: info
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            SRC_REPO="${{ github.repository }}"
+            RELEASE_URL="${{ github.event.release.html_url }}"
+          else
+            TAG="${{ inputs.tag }}"
+            SRC_REPO="${{ inputs.source_repo || github.repository }}"
+            RELEASE_URL="${{ inputs.release_url || '' }}"
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "Tag is empty, cannot notify orchestrator."
+            exit 1
+          fi
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
-          echo "url=${{ github.event.release.html_url }}" >> "$GITHUB_OUTPUT"
+          echo "repo=$SRC_REPO" >> "$GITHUB_OUTPUT"
+          echo "url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+
+          echo "Normalized values:"
+          echo "  TAG:        $TAG"
+          echo "  SRC_REPO:   $SRC_REPO"
+          echo "  RELEASE_URL:$RELEASE_URL"
 
       - name: Check that this is an RC tag
         id: rc_check
@@ -46,8 +79,8 @@ jobs:
         id: app_token
         uses: actions/create-github-app-token@v2
         with:
-          app_id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
-          private_key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
+          app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
+          private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
 
       - name: Notify orchestrator (repo-a-manager)
         if: steps.rc_check.outputs.should_notify == 'true'
