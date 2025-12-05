@@ -1,0 +1,96 @@
+name: Promote RC to final release
+
+on:
+  repository_dispatch:
+    types: [promote-rc]
+
+permissions:
+  contents: write   # required to create tags & releases
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract RC tag from payload
+        id: info
+        run: |
+          RC_TAG="${{ github.event.client_payload.tag }}"
+          if [ -z "$RC_TAG" ]; then
+            echo "RC tag not provided in client_payload.tag"
+            exit 1
+          fi
+
+          # Strip from first "-rc" onwards: "v1.2.3-rc1" -> "v1.2.3"
+          FINAL_TAG="${RC_TAG%%-rc*}"
+
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+          echo "final_tag=$FINAL_TAG" >> "$GITHUB_OUTPUT"
+
+          echo "RC tag: $RC_TAG"
+          echo "Final tag: $FINAL_TAG"
+
+      - name: Get commit SHA for RC tag
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RC_TAG="${{ steps.info.outputs.rc_tag }}"
+
+          echo "Fetching commit SHA for tag $RC_TAG in $GITHUB_REPOSITORY"
+
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RC_TAG" --jq '.object.sha')
+
+          if [ -z "$SHA" ]; then
+            echo "Could not resolve SHA for tag $RC_TAG"
+            exit 1
+          fi
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "SHA: $SHA"
+
+      - name: Create final tag (x.y.z)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FINAL_TAG="${{ steps.info.outputs.final_tag }}"
+          SHA="${{ steps.sha.outputs.sha }}"
+
+          echo "Creating final tag $FINAL_TAG at $SHA"
+
+          # Try to create the ref; ignore error if it already exists
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -X POST \
+            -f ref="refs/tags/$FINAL_TAG" \
+            -f sha="$SHA" || echo "Tag $FINAL_TAG may already exist, continuing."
+
+      - name: Create final release (x.y.z)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FINAL_TAG="${{ steps.info.outputs.final_tag }}"
+          RC_TAG="${{ steps.info.outputs.rc_tag }}"
+          SHA="${{ steps.sha.outputs.sha }}"
+
+          echo "Creating final release for $FINAL_TAG (from RC $RC_TAG)"
+
+          # Try to create the release; if it already exists, just update prerelease flag
+          set +e
+          gh release create "$FINAL_TAG" \
+            --target "$SHA" \
+            --title "$FINAL_TAG" \
+            --notes "Promotion of RC $RC_TAG" \
+            --repo "$GITHUB_REPOSITORY"
+          STATUS=$?
+          set -e
+
+          if [ $STATUS -ne 0 ]; then
+            echo "Release $FINAL_TAG may already exist, trying to edit instead."
+            gh release edit "$FINAL_TAG" \
+              --target "$SHA" \
+              --title "$FINAL_TAG" \
+              --notes "Promotion of RC $RC_TAG" \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+
+          echo "Final release $FINAL_TAG ready."
