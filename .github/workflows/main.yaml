@@ -113,7 +113,7 @@ jobs:
 
     notify:
       needs: build
-      uses: .github/workflows/notify-manager.yaml@main
+      uses: OpenGitTraining/repo-A/.github/workflows/notify-manager.yaml@main
       with:
         tag: ${{ needs.build.outputs.tag }}
         release_url: ${{ needs.build.outputs.release_url }}
