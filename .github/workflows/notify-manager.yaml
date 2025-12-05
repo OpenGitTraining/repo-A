@@ -1,4 +1,4 @@
-name: Notify repo-a-manager when RC is created
+name: Notify Orchestrator on RC created
 
 on:
   # Fires when you create a prerelease in the UI or via API
