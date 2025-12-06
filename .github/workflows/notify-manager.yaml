@@ -82,15 +82,6 @@ jobs:
             repo-a
             repo-a-manager
 
-      - name: Debug check access to orchestrator
-        run: |
-          echo "Checking access to OpenGitTraining/repo-a-manager..."
-          curl -sS \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ steps.app_token.outputs.token }}" \
-            https://api.github.com/repos/${{ env.ORCH_REPO }}
-
-
       - name: Notify orchestrator
         if: steps.rc_check.outputs.should_notify == 'true'
         run: |
