@@ -31,54 +31,54 @@ jobs:
               run: |
                 ctest --test-dir build -C Release --output-on-failure
 
-    #         - name: Package
-    #           run: |
-    #             cmake --build build --target package
+            - name: Package
+              run: |
+                cmake --build build --target package
 
-    #         - name: Tagging
-    #           id: tagging
-    #           run: |
-    #             # fetch tags so git can see them
-    #             git fetch --tags origin
+            - name: Tagging
+              id: tagging
+              run: |
+                # fetch tags so git can see them
+                git fetch --tags origin
 
-    #             echo "Fetching latest tag with gh..."
-    #             LATEST_TAG=$(git tag --list --sort=-creatordate | head -n 1 || echo "")
+                echo "Fetching latest tag with gh..."
+                LATEST_TAG=$(git tag --list --sort=-creatordate | head -n 1 || echo "")
 
-    #             if [ -z "$LATEST_TAG" ]; then
-    #               # No tags yet → first version
-    #               BASE_VERSION="0.1.0"
-    #               RC_TAG="${BASE_VERSION}-rc"
-    #             else
-    #               echo "Latest tag found: $LATEST_TAG"
+                if [ -z "$LATEST_TAG" ]; then
+                  # No tags yet → first version
+                  BASE_VERSION="0.1.0"
+                  RC_TAG="${BASE_VERSION}-rc"
+                else
+                  echo "Latest tag found: $LATEST_TAG"
 
-    #               # Strip optional leading refs/tags/ and v
-    #               LATEST_TAG="${LATEST_TAG#refs/tags/}"
-    #               LATEST_TAG_NO_V="${LATEST_TAG#v}"
+                  # Strip optional leading refs/tags/ and v
+                  LATEST_TAG="${LATEST_TAG#refs/tags/}"
+                  LATEST_TAG_NO_V="${LATEST_TAG#v}"
 
-    #               # Remove -rc or -rc.N suffix if present
-    #               BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
+                  # Remove -rc or -rc.N suffix if present
+                  BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
 
-    #               echo "Base part parsed: $BASE_PART"
+                  echo "Base part parsed: $BASE_PART"
 
-    #               # Split version
-    #               IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
+                  # Split version
+                  IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
 
-    #               if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
-    #                 echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
-    #                 exit 1
-    #               fi
+                  if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
+                    echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
+                    exit 1
+                  fi
 
-    #               # Bump patch for new RC
-    #               PATCH=$((PATCH + 1))
-    #               BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-    #               RC_TAG="${BASE_VERSION}-rc"
-    #             fi
+                  # Bump patch for new RC
+                  PATCH=$((PATCH + 1))
+                  BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+                  RC_TAG="${BASE_VERSION}-rc"
+                fi
 
-    #             echo "base_version=$BASE_VERSION"
-    #             echo "rc_tag=$RC_TAG"
+                echo "base_version=$BASE_VERSION"
+                echo "rc_tag=$RC_TAG"
 
-    #             echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
-    #             echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+                echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+                echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
 
     #         - name: Create RC tag
     #           id: create_rc
