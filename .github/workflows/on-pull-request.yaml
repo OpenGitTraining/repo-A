@@ -37,6 +37,8 @@ jobs:
 
             - name: Tagging
               id: tagging
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                 # fetch tags so git can see them
                 git fetch --tags origin
