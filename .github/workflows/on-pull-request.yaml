@@ -1,4 +1,5 @@
 name: On Pull Request
+run-name: On Pull Request
 
 on:
     workflow_dispatch:
