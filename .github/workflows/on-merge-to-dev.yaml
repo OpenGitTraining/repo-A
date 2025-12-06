@@ -1,4 +1,5 @@
 name: On Merge To Dev
+run-name: On Merge To Dev
 
 on:
     workflow_dispatch:
@@ -42,7 +43,7 @@ jobs:
                 git fetch --tags origin
 
                 echo "Fetching latest tag with gh..."
-                LATEST_TAG=$(git tag --list --sort=-creatordate | head -n 1 || echo "")
+                LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
 
                 if [ -z "$LATEST_TAG" ]; then
                   # No tags yet → first version
