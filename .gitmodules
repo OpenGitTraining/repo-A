@@ -1,0 +1,3 @@
+[submodule ".OpenGitTraining"]
+	path = .OpenGitTraining
+	url = git@github.com:OpenGitTraining/.OpenGitTraining.git
