@@ -1,0 +1,95 @@
+name: On Submodule Update
+run-name: On Submodule Update
+
+on:
+  repository_dispatch:
+    types: [submodule-update]
+
+permissions:
+  contents: write
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show incoming event
+        run: |
+          echo "Full event:"
+          echo '${{ toJson(github.event) }}'
+
+      - name: Validate this submodule is relevant
+        id: check
+        run: |
+          SUBMODULE_REPO="${{ github.event.client_payload.submodule_repo }}"
+          SUBMODULE_PATH="${{ github.event.client_payload.submodule_path }}"
+          REF="${{ github.event.client_payload.ref }}"
+          BRANCH="${{ github.event.client_payload.branch }}"
+
+          echo "Requested submodule update:"
+          echo "  submodule_repo:  $SUBMODULE_REPO"
+          echo "  submodule_path:  $SUBMODULE_PATH"
+          echo "  ref:             $REF"
+          echo "  branch:          $BRANCH"
+
+          # Optional: only handle a specific shadow repo
+          if [ "$SUBMODULE_REPO" != "OpenGitTraining/.OpenGitTraining" ]; then
+            echo "This repo does not handle submodule_repo=$SUBMODULE_REPO. Skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout this repo
+        if: steps.check.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+        with:
+          submodules: false        # we will manage submodule manually
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure submodule exists
+        if: steps.check.outputs.should_run == 'true'
+        run: |
+          SUBMODULE_PATH="${{ github.event.client_payload.submodule_path }}"
+
+          if [ ! -f .gitmodules ]; then
+            echo ".gitmodules not found; nothing to update."
+            exit 0
+          fi
+
+          if ! grep -q "$SUBMODULE_PATH" .gitmodules; then
+            echo "Submodule path '$SUBMODULE_PATH' not found in .gitmodules. Skipping."
+            exit 0
+          fi
+
+      - name: Update submodule to requested ref
+        if: steps.check.outputs.should_run == 'true'
+        run: |
+          SUBMODULE_PATH="${{ github.event.client_payload.submodule_path }}"
+          REF="${{ github.event.client_payload.ref }}"
+
+          echo "Initializing submodule at $SUBMODULE_PATH..."
+          git submodule init "$SUBMODULE_PATH" || true
+          git submodule update "$SUBMODULE_PATH" || true
+
+          echo "Moving submodule to $REF"
+          cd "$SUBMODULE_PATH"
+          git fetch origin
+          git checkout "$REF"
+          cd ..
+
+          git add "$SUBMODULE_PATH"
+
+          # Commit if there is any change
+          git diff --cached --quiet && {
+            echo "No submodule change; nothing to commit."
+            exit 0
+          }
+
+          COMMIT_MSG="chore: bump $SUBMODULE_PATH to $REF"
+          echo "Committing: $COMMIT_MSG"
+          git commit -m "$COMMIT_MSG"
+
+          echo "Pushing changes..."
+          git push origin HEAD
