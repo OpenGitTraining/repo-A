@@ -69,6 +69,8 @@ jobs:
           SUBMODULE_PATH="${{ github.event.client_payload.submodule_path }}"
           REF="${{ github.event.client_payload.ref }}"
 
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "git@github.com:"
+
           echo "Initializing submodule at $SUBMODULE_PATH..."
           git submodule init "$SUBMODULE_PATH" || true
           git submodule update "$SUBMODULE_PATH" || true
