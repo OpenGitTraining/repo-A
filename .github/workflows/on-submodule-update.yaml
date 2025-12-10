@@ -64,8 +64,7 @@ jobs:
             exit 0
           fi
 
-      - name: Generate app token for this repo
-        if: steps.check.outputs.should_run == 'true'
+      - name: Generate installation token (GitHub App)
         id: app_token
         uses: actions/create-github-app-token@v2
         with:
