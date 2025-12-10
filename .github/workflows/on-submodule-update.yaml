@@ -64,10 +64,20 @@ jobs:
             exit 0
           fi
 
+      - name: Generate installation token (GitHub App)
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
+          private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ github.event.repository.name }}
+
       - name: Update submodule to requested ref
         if: steps.check.outputs.should_run == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
           SUBMODULE_PATH="${{ github.event.client_payload.submodule_path }}"
           REF="${{ github.event.client_payload.ref }}"
