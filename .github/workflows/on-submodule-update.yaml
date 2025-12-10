@@ -33,7 +33,7 @@ jobs:
           echo "  ref:             $REF"
           echo "  branch:          $BRANCH"
 
-          # Optional: only handle a specific shadow repo
+          # NOTE(PO): Optional: only handle a specific shadow repo
           if [ "$SUBMODULE_REPO" != "OpenGitTraining/.OpenGitTraining" ]; then
             echo "This repo does not handle submodule_repo=$SUBMODULE_REPO. Skipping."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -42,12 +42,23 @@ jobs:
 
           echo "should_run=true" >> "$GITHUB_OUTPUT"
 
+      - name: Generate installation token (GitHub App)
+        if: steps.check.outputs.should_run == 'true'
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
+          private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ github.event.repository.name }}
+
       - name: Checkout this repo
         if: steps.check.outputs.should_run == 'true'
         uses: actions/checkout@v4
         with:
           submodules: false        # we will manage submodule manually
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app_token.outputs.token }}
 
       - name: Ensure submodule exists
         if: steps.check.outputs.should_run == 'true'
@@ -64,16 +75,6 @@ jobs:
             exit 0
           fi
 
-      - name: Generate installation token (GitHub App)
-        id: app_token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.GH_APP__CI_ORCHESTRATOR__ID }}
-          private-key: ${{ secrets.GH_APP__CI_ORCHESTRATOR__PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: |
-            ${{ github.event.repository.name }}
-
       - name: Update submodule to requested ref
         if: steps.check.outputs.should_run == 'true'
         env:
@@ -87,15 +88,15 @@ jobs:
 
           git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "git@github.com:"
 
-          BASE_BRANCH="main"
+          MAIN_BRANCH="main"
 
-          echo "Base branch: $BASE_BRANCH"
+          echo "Base branch: $MAIN_BRANCH"
           echo "Submodule path: $SUBMODULE_PATH"
           echo "Target ref: $REF"
 
           # Start from main
-          git fetch origin "$BASE_BRANCH"
-          git checkout "$BASE_BRANCH"
+          git fetch origin "$MAIN_BRANCH"
+          git checkout "$MAIN_BRANCH"
 
           echo "Initializing submodule at $SUBMODULE_PATH..."
           git submodule init "$SUBMODULE_PATH" || true
@@ -122,7 +123,7 @@ jobs:
 
           BRANCH_NAME="chore/updated-submodule-${NAME}"
 
-          echo "Creating branch $BRANCH_NAME from $BASE_BRANCH"
+          echo "Creating branch $BRANCH_NAME from $MAIN_BRANCH"
           git checkout -b "$BRANCH_NAME"
 
           COMMIT_MSG="chore: bump $SUBMODULE_PATH to $REF"
@@ -139,9 +140,12 @@ jobs:
           echo "Creating PR: $TITLE"
 
           gh api \
+            --X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
             repos/${GITHUB_REPOSITORY}/pulls \
             -f title="$TITLE" \
             -f head="$BRANCH_NAME" \
-            -f base="$BASE_BRANCH" \
+            -f base="$MAIN_BRANCH" \
             -f body="$BODY" \
           || echo "PR may already exist for branch $BRANCH_NAME; skipping PR creation."
