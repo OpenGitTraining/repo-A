@@ -10,113 +10,98 @@ permissions:
   contents: write
 
 jobs:
-    build:
-        runs-on: [ ubuntu-latest ]
+  build:
+    uses: ./.github/workflows/build.yaml
+    with:
+      cmake_build_type: Release
+      upload_artifacts: true
 
-        outputs:
-            tag: ${{ steps.prerelease.outputs.tag }}
-            release_url: ${{ steps.prerelease.outputs.release_url }}
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+  release_rc:
+    needs: build
+    runs-on: [ ubuntu-latest ]
 
-            - name: Generate
-              run: |
-                cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    outputs:
+        tag: ${{ steps.prerelease.outputs.tag }}
+        release_url: ${{ steps.prerelease.outputs.release_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Build
-              run: |
-                cmake --build build --config Release
+      - name: Download staged outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: ${{ needs.build.outputs.out_dir }}
 
-            - name: Test
-              run: |
-                ctest --test-dir build -C Release --output-on-failure
+      - name: Tagging
+        id: tagging
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --tags origin
 
-            - name: Package
-              run: |
-                cmake --build build --target package
+          echo "Fetching latest tag with gh..."
+          LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
 
-            - name: Tagging
-              id: tagging
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                # fetch tags so git can see them
-                git fetch --tags origin
+          if [ -z "$LATEST_TAG" ]; then
+            BASE_VERSION="0.1.0"
+            RC_TAG="${BASE_VERSION}-rc"
+          else
+            echo "Latest tag found: $LATEST_TAG"
 
-                echo "Fetching latest tag with gh..."
-                LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+            LATEST_TAG="${LATEST_TAG#refs/tags/}"
+            LATEST_TAG_NO_V="${LATEST_TAG#v}"
+            BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
 
-                if [ -z "$LATEST_TAG" ]; then
-                  # No tags yet → first version
-                  BASE_VERSION="0.1.0"
-                  RC_TAG="${BASE_VERSION}-rc"
-                else
-                  echo "Latest tag found: $LATEST_TAG"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
+            if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
+              echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
+              exit 1
+            fi
 
-                  # Strip optional leading refs/tags/ and v
-                  LATEST_TAG="${LATEST_TAG#refs/tags/}"
-                  LATEST_TAG_NO_V="${LATEST_TAG#v}"
+            PATCH=$((PATCH + 1))
+            BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            RC_TAG="${BASE_VERSION}-rc"
+          fi
 
-                  # Remove -rc or -rc.N suffix if present
-                  BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
+          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
 
-                  echo "Base part parsed: $BASE_PART"
+      - name: Create RC tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
 
-                  # Split version
-                  IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
+          git tag "${{ steps.tagging.outputs.rc_tag }}" "${GITHUB_SHA}"
+          git push origin "${{ steps.tagging.outputs.rc_tag }}"
 
-                  if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
-                    echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
-                    exit 1
-                  fi
+      - name: Create GitHub Pre-Release
+        id: prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tagging.outputs.rc_tag }}"
 
-                  # Bump patch for new RC
-                  PATCH=$((PATCH + 1))
-                  BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-                  RC_TAG="${BASE_VERSION}-rc"
-                fi
+          echo "$ASSETS"
+          ls -la "${{ needs.build.outputs.out_dir }}" || true
 
-                echo "base_version=$BASE_VERSION"
-                echo "rc_tag=$RC_TAG"
+          gh release create "$TAG" \
+          "${{ needs.build.outputs.out_dir }}"/* \
+          --prerelease \
+          --title "Pre-Release $TAG" \
+          --notes "Automated Pre-release"
 
-                echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
-                echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"
+          echo "release_url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
 
-            - name: Create RC tag
-              id: create_rc
-              run: |
-                git config user.name "github-actions"
-                git config user.email "github-actions@users.noreply.github.com"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_OUTPUT"
 
-                git tag "${{ steps.tagging.outputs.rc_tag }}" "${GITHUB_SHA}"
-                git push origin "${{ steps.tagging.outputs.rc_tag }}"
-
-            - name: Create GitHub Pre-Release
-              id: prerelease
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                TAG="${{ steps.tagging.outputs.rc_tag }}"
-                ASSETS=$(find ./out -type f )
-                echo "$ASSETS"
-
-                gh release create "$TAG" \
-                ./out/* \
-                --prerelease \
-                --title "Pre-Release $TAG" \
-                --notes "Automated Pre-release"
-
-                echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-                # Release URL (for convenience, optional)
-                URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-                echo "release_url=$URL" >> "$GITHUB_OUTPUT"
-
-    notify:
-      needs: build
-      uses: OpenGitTraining/repo-A/.github/workflows/notify-manager.yaml@main
-      with:
-        tag: ${{ needs.build.outputs.tag }}
-        release_url: ${{ needs.build.outputs.release_url }}
-        source_repo: ${{ github.repository }}
-      secrets: inherit
+  notify:
+    needs: release_rc
+    uses: OpenGitTraining/repo-A/.github/workflows/notify-manager.yaml@main
+    with:
+      tag: ${{ needs.release_rc.outputs.tag }}
+      release_url: ${{ needs.release_rc.outputs.release_url }}
+      source_repo: ${{ github.repository }}
+    secrets: inherit

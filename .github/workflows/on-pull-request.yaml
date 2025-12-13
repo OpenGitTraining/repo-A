@@ -7,78 +7,11 @@ on:
         branches: ["dev"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
     build:
-        runs-on: [ ubuntu-latest ]
-
-        outputs:
-            tag: ${{ steps.prerelease.outputs.tag }}
-            release_url: ${{ steps.prerelease.outputs.release_url }}
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            - name: Generate
-              run: |
-                cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-            - name: Build
-              run: |
-                cmake --build build --config Release
-
-            - name: Test
-              run: |
-                ctest --test-dir build -C Release --output-on-failure
-
-            - name: Package
-              run: |
-                cmake --build build --target package
-
-            - name: Tagging
-              id: tagging
-              env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                # fetch tags so git can see them
-                git fetch --tags origin
-
-                echo "Fetching latest tag with gh..."
-                LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
-
-                if [ -z "$LATEST_TAG" ]; then
-                  # No tags yet → first version
-                  BASE_VERSION="0.1.0"
-                  RC_TAG="${BASE_VERSION}-rc"
-                else
-                  echo "Latest tag found: $LATEST_TAG"
-
-                  # Strip optional leading refs/tags/ and v
-                  LATEST_TAG="${LATEST_TAG#refs/tags/}"
-                  LATEST_TAG_NO_V="${LATEST_TAG#v}"
-
-                  # Remove -rc or -rc.N suffix if present
-                  BASE_PART="${LATEST_TAG_NO_V%%-rc*}"
-
-                  echo "Base part parsed: $BASE_PART"
-
-                  # Split version
-                  IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_PART"
-
-                  if [ -z "$MAJOR" ] || [ -z "$MINOR" ] || [ -z "$PATCH" ]; then
-                    echo "ERROR: Could not parse a valid semver from tag '$LATEST_TAG'"
-                    exit 1
-                  fi
-
-                  # Bump patch for new RC
-                  PATCH=$((PATCH + 1))
-                  BASE_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-                  RC_TAG="${BASE_VERSION}-rc"
-                fi
-
-                echo "base_version=$BASE_VERSION"
-                echo "rc_tag=$RC_TAG"
-
-                echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
-                echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+      uses: ./.github/workflows/build.yaml
+      with:
+        cmake_build_type: Release
+        upload_artifacts: true
