@@ -98,10 +98,10 @@ jobs:
           echo "release_url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_OUTPUT"
 
   notify:
-    needs: build
+    needs: release_rc
     uses: OpenGitTraining/repo-A/.github/workflows/notify-manager.yaml@main
     with:
-      tag: ${{ needs.build.outputs.tag }}
-      release_url: ${{ needs.build.outputs.release_url }}
+      tag: ${{ needs.release_rc.outputs.tag }}
+      release_url: ${{ needs.release_rc.outputs.release_url }}
       source_repo: ${{ github.repository }}
     secrets: inherit
