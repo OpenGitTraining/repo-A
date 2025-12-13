@@ -40,6 +40,9 @@ jobs:
           mkdir -p out
           gh release download "$RC_TAG" --dir out
 
+          echo "Assets:"
+          ls -la out || true
+
           echo "Fetching commit SHA for tag $RC_TAG in $GITHUB_REPOSITORY"
 
           SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RC_TAG" --jq '.object.sha')
