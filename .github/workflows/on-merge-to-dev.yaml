@@ -91,6 +91,9 @@ jobs:
           --title "Pre-Release $TAG" \
           --notes "Automated Pre-release"
 
+          echo "tag=$TAG"
+          echo "release_url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "release_url=https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_OUTPUT"
 
