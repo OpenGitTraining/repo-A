@@ -37,6 +37,9 @@ jobs:
         run: |
           RC_TAG="${{ steps.info.outputs.rc_tag }}"
 
+          mkdir -p out
+          gh release download "$RC_TAG" --dir out
+
           echo "Fetching commit SHA for tag $RC_TAG in $GITHUB_REPOSITORY"
 
           SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RC_TAG" --jq '.object.sha')
@@ -77,6 +80,7 @@ jobs:
           # Try to create the release; if it already exists, just update prerelease flag
           set +e
           gh release create "$FINAL_TAG" \
+          out/* \
             --target "$SHA" \
             --title "$FINAL_TAG" \
             --notes "Promotion of RC $RC_TAG" \
@@ -87,6 +91,7 @@ jobs:
           if [ $STATUS -ne 0 ]; then
             echo "Release $FINAL_TAG may already exist, trying to edit instead."
             gh release edit "$FINAL_TAG" \
+            out/* \
               --target "$SHA" \
               --title "$FINAL_TAG" \
               --notes "Promotion of RC $RC_TAG" \
