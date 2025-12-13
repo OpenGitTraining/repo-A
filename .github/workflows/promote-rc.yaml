@@ -30,30 +30,51 @@ jobs:
           echo "RC tag: $RC_TAG"
           echo "Final tag: $FINAL_TAG"
 
-      - name: Get commit SHA for RC tag
-        id: sha
+      - name: Download RC assets and resolve commit SHA
+        id: resolved
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RC_TAG="${{ steps.info.outputs.rc_tag }}"
+          REPO="${GITHUB_REPOSITORY}"
 
+          rm -rf out
           mkdir -p out
-          gh release download "$RC_TAG" --dir out
 
-          echo "Assets:"
+          echo "Downloading assets from RC release $RC_TAG in $REPO ..."
+          gh release download "$RC_TAG" --dir out --repo "$REPO"
+
+          echo "Assets downloaded to out/:"
           ls -la out || true
 
-          echo "Fetching commit SHA for tag $RC_TAG in $GITHUB_REPOSITORY"
-
-          SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RC_TAG" --jq '.object.sha')
-
-          if [ -z "$SHA" ]; then
-            echo "Could not resolve SHA for tag $RC_TAG"
+          # Fail fast if there are no assets (this is the most common root cause)
+          if [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "ERROR: No assets were downloaded from RC release $RC_TAG."
+            echo "This means the RC prerelease likely has no uploaded assets."
+            echo "Check the RC prerelease step in On Merge To Dev: it must upload the CPack outputs to the prerelease."
             exit 1
           fi
 
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "SHA: $SHA"
+          echo "Resolving commit SHA for tag $RC_TAG ..."
+
+          # Get ref object SHA (could be commit SHA for lightweight tag or tag-object SHA for annotated tag)
+          REF_OBJ_SHA=$(gh api "repos/$REPO/git/ref/tags/$RC_TAG" --jq '.object.sha')
+
+          if [ -z "$REF_OBJ_SHA" ]; then
+            echo "ERROR: Could not resolve tag ref for $RC_TAG"
+            exit 1
+          fi
+
+          # If annotated tag, dereference to commit; else keep as-is
+          COMMIT_SHA=$(gh api "repos/$REPO/git/tags/$REF_OBJ_SHA" --jq '.object.sha' 2>/dev/null || echo "$REF_OBJ_SHA")
+
+          if [ -z "$COMMIT_SHA" ]; then
+            echo "ERROR: Could not resolve commit SHA for $RC_TAG"
+            exit 1
+          fi
+
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Commit SHA: $COMMIT_SHA"
 
       - name: Create final tag (x.y.z)
         env:
@@ -70,35 +91,32 @@ jobs:
             -f ref="refs/tags/$FINAL_TAG" \
             -f sha="$SHA" || echo "Tag $FINAL_TAG may already exist, continuing."
 
-      - name: Create final release (x.y.z)
+      - name: Create or update final release (x.y.z) with RC assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FINAL_TAG="${{ steps.info.outputs.final_tag }}"
           RC_TAG="${{ steps.info.outputs.rc_tag }}"
-          SHA="${{ steps.sha.outputs.sha }}"
+          SHA="${{ steps.resolved.outputs.commit_sha }}"
+          REPO="${GITHUB_REPOSITORY}"
 
-          echo "Creating final release for $FINAL_TAG (from RC $RC_TAG)"
+          echo "Ensuring final release $FINAL_TAG exists (from RC $RC_TAG)"
 
-          # Try to create the release; if it already exists, just update prerelease flag
-          set +e
-          gh release create "$FINAL_TAG" \
-          out/* \
-            --target "$SHA" \
-            --title "$FINAL_TAG" \
-            --notes "Promotion of RC $RC_TAG" \
-            --repo "$GITHUB_REPOSITORY"
-          STATUS=$?
-          set -e
-
-          if [ $STATUS -ne 0 ]; then
-            echo "Release $FINAL_TAG may already exist, trying to edit instead."
+          if gh release view "$FINAL_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release exists; uploading assets..."
+            gh release upload "$FINAL_TAG" out/* --clobber --repo "$REPO"
             gh release edit "$FINAL_TAG" \
-            out/* \
+              --title "$FINAL_TAG" \
+              --notes "Promotion of RC $RC_TAG" \
+              --repo "$REPO"
+          else
+            echo "Creating new release..."
+            gh release create "$FINAL_TAG" \
+              out/* \
               --target "$SHA" \
               --title "$FINAL_TAG" \
               --notes "Promotion of RC $RC_TAG" \
-              --repo "$GITHUB_REPOSITORY"
+              --repo "$REPO"
           fi
 
           echo "Final release $FINAL_TAG ready."
