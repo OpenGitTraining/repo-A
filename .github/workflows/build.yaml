@@ -1,0 +1,61 @@
+name: Build (Generate/Build/Test/Package)
+
+on:
+  workflow_call:
+    inputs:
+      cmake_build_type:
+        type: string
+        required: false
+        default: Release
+      upload_artifacts:
+        type: boolean
+        required: false
+        default: true
+    outputs:
+      out_dir:
+        description: "Directory containing staged build/package outputs"
+        value: ${{ jobs.build.outputs.out_dir }}
+      artifact_name:
+        description: "Uploaded artifact name (if upload_artifacts=true)"
+        value: ${{ jobs.build.outputs.artifact_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      out_dir: ${{ steps.meta.outputs.out_dir }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ inputs.cmake_build_type }}
+
+      - name: Build
+        run: |
+          cmake --build build --config ${{ inputs.cmake_build_type }}
+
+      - name: Test
+        run: |
+          ctest --test-dir build -C ${{ inputs.cmake_build_type }} --output-on-failure
+
+      - name: Package
+        run: |
+          cmake --build build --target package
+
+      - name: Set outputs
+        id: meta
+        run: |
+          echo "out_dir=out" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=repo-a-build-out" >> "$GITHUB_OUTPUT"
+
+      - name: Upload staged outputs
+        if: ${{ inputs.upload_artifacts }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: ${{ steps.meta.outputs.out_dir }}
