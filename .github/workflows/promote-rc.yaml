@@ -1,4 +1,5 @@
 name: Promote RC to final release
+run-name: Promote RC to final release
 
 on:
   repository_dispatch:
