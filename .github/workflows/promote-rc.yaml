@@ -81,7 +81,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FINAL_TAG="${{ steps.info.outputs.final_tag }}"
-          SHA="${{ steps.sha.outputs.sha }}"
+          SHA="${{ steps.resolved.outputs.commit_sha }}"
 
           echo "Creating final tag $FINAL_TAG at $SHA"
 
@@ -101,6 +101,8 @@ jobs:
           REPO="${GITHUB_REPOSITORY}"
 
           echo "Ensuring final release $FINAL_TAG exists (from RC $RC_TAG)"
+          echo "Assets present in out/:"
+          find out -maxdepth 1 -type f -print -ls
 
           if gh release view "$FINAL_TAG" --repo "$REPO" >/dev/null 2>&1; then
             echo "Release exists; uploading assets..."
