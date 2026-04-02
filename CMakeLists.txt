@@ -12,6 +12,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(appLib)
 target_sources(appLib PUBLIC include/a.hpp src/a.cpp)
 target_include_directories(appLib PUBLIC include)
+
+add_executable(appMain)
+target_sources(appMain PRIVATE src/main.cpp)
+target_link_libraries(appMain PRIVATE appLib)
 # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 # Test
 # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
